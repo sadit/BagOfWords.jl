@@ -1,4 +1,4 @@
-export Synonyms, IgnoreStopwords, vocabmap, create_vocabmap, vocab 
+export Synonyms, vocabmap, create_vocabmap, vocab 
 
 struct Synonyms <: AbstractTokenTransformation
     map::Dict{String,String}
@@ -8,18 +8,6 @@ end
 
 function TextSearch.transform_unigram(tt::Synonyms, tok)
     get(tt.map, tok, tok)
-end
-
-struct IgnoreStopwords <: AbstractTokenTransformation
-    stopwords::Set{String}
-end
-
-function TextSearch.transform_unigram(tt::IgnoreStopwords, tok)
-    tok in tt.stopwords ? nothing : tok
-end
-
-struct ChainTransformation <: AbstractTokenTransformation
-    list::AbstractVector{<:AbstractTokenTransformation}    
 end
 
 function TextSearch.transform_unigram(tt::ChainTransformation, tok)
@@ -35,11 +23,10 @@ function vocab(
             text,
             tt=IdentityTokenTransformation();
             nlist=[1], qlist=[], collocations=0, mindocs=3, maxndocs=1.0, 
-            textconfig=TextConfig(; nlist, del_punc=false, del_diac=true, lc=true)
+            textconfig=TextConfig(; nlist, del_punc=false, del_diac=true, lc=true),
     )
     
     V = Vocabulary(TextConfig(textconfig; qlist, collocations, tt), text)
-
     filter_tokens(V) do t
         mindocs <= t.ndocs < trainsize(V) * maxndocs
     end
@@ -122,7 +109,7 @@ function vocabmap(; outfile::String, quant::AbstractFloat, emb::NamedTuple, trai
     map
 end
 
-function create_vocabmap(config; embfile=embedding_by_lang(config.lang), nick=config.nick, quantlist=[0.01, 0.03, 0.1, 0.3, 1], path="mapping")
+function create_vocabmap(config, embfile; nick=config.nick, quantlist=[0.01, 0.03, 0.1, 0.3, 1], path="mapping")
     train = read_json_dataframe(config.trainfile)
     emb = load_emb(embfile)
     mkpath(path)
