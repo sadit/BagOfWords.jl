@@ -1,6 +1,6 @@
 module BagOfWords
 
-using TextSearch, SimilaritySearch, DataFrames
+using TextSearch, SimilaritySearch, DataFrames, Random
 using JSON, CodecZlib, JLD2, DataFrames
 using LIBLINEAR, KNearestCenters
 using MLUtils, StatsBase
@@ -76,5 +76,7 @@ function runconfig(
     )
 end
 
+
+include("modelselection.jl")
 
 end
