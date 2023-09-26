@@ -22,13 +22,17 @@ end
 function vocab(
             text,
             tt=IdentityTokenTransformation();
-            nlist=[1], qlist=[], collocations=0, mindocs=3, maxndocs=1.0, 
+            nlist=[1], qlist=[], collocations=0, mindocs=1, maxndocs=1.0, 
             textconfig=TextConfig(; nlist, del_punc=false, del_diac=true, lc=true),
     )
     
     V = Vocabulary(TextConfig(textconfig; qlist, collocations, tt), text)
-    filter_tokens(V) do t
-        mindocs <= t.ndocs < trainsize(V) * maxndocs
+    if mindocs > 1 || maxndocs < 1
+        filter_tokens(V) do t
+            mindocs <= t.ndocs < trainsize(V) * maxndocs
+        end
+    else
+        V
     end
 end
 

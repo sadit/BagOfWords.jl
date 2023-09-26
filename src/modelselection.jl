@@ -3,13 +3,15 @@ export modelselection
 function modelselection(scorefun::Function, dataset, samplesize=16;
         climbing=samplesize ÷ 2,
         folds=3,
+        validation=nothing,
         mapfile_options=[nothing],
         gw_options = [IdfWeighting(), EntropyWeighting()],
-        lw_options = [BinaryLocalWeighting(), TfWeighting()],
+        lw_options = [BinaryLocalWeighting()],
         collocations_options = [0, 3, 5, 7, 9, 11],
-        mindocs_options = [1, 3, 5, 10, 20, 30],
-        qlist_options = [[3], [2], [2, 4], [2, 5], [3, 5]],
-        maxndocs_options = [0.5],
+        mindocs_options = [3],
+        qlist_options = [[2, 4], [2, 5], [3, 5]],
+        maxndocs_options = [1.0],
+        minweight_options = [0.001]
     )
     n = size(dataset, 1)
     seen = Set()
@@ -23,9 +25,10 @@ function modelselection(scorefun::Function, dataset, samplesize=16;
         collocations = rand(collocations_options)
         mindocs = rand(mindocs_options)
         maxndocs = rand(maxndocs_options)
+        minweight = rand(minweight_options)
         qlist = rand(qlist_options)
         mapfile = rand(mapfile_options)
-        (; gw, lw, collocations, mindocs, maxndocs, qlist, mapfile, spelling=nothing)
+        (; gw, lw, collocations, mindocs, maxndocs, minweight, qlist, mapfile, spelling=nothing)
     end
 
     combine(a, b) = let
@@ -34,10 +37,11 @@ function modelselection(scorefun::Function, dataset, samplesize=16;
         collocations = rand((a.collocations, b.collocations))
         mindocs = rand((a.mindocs, b.mindocs)) 
         maxndocs = rand((a.maxndocs, b.maxndocs))
+        minweight = rand((a.minweight, b.minweight))
         qlist = rand((a.qlist, b.qlist))
         mapfile = rand((a.mapfile, b.mapfile))
 
-        (; gw, lw, collocations, mindocs, maxndocs, qlist, mapfile, spelling=nothing)
+        (; gw, lw, collocations, mindocs, maxndocs, minweight, qlist, mapfile, spelling=nothing)
     end
 
     mutate(c) = combine(c, randomconf())
@@ -54,8 +58,12 @@ function modelselection(scorefun::Function, dataset, samplesize=16;
         push!(seen, config)
         empty!(scores)
         @info "random-search> $config -- adv $(length(configlist))"
-        for (itrain, itest) in kfolds(P; k=folds)
-            push!(scores, evalconfig(config, dataset[itrain, :], dataset[itest, :]))
+        if validation === nothing
+            for (itrain, itest) in kfolds(P; k=folds)
+                push!(scores, evalconfig(config, dataset[itrain, :], dataset[itest, :]))
+            end
+        else
+            push!(scores, evalconfig(config, dataset, validation))
         end
 
         score = mean(scores)
@@ -70,8 +78,12 @@ function modelselection(scorefun::Function, dataset, samplesize=16;
         push!(seen, config)
         empty!(scores)
         @info "hill-climbing> $config -- adv $(length(configlist))"
-        for (itrain, itest) in kfolds(P; k=folds)
-            push!(scores, evalconfig(config, dataset[itrain, :], dataset[itest, :]))
+        if validation === nothing
+            for (itrain, itest) in kfolds(P; k=folds)
+                push!(scores, evalconfig(config, dataset[itrain, :], dataset[itest, :]))
+            end
+        else
+            push!(scores, evalconfig(config, dataset, validation))
         end
 
         score = mean(scores)

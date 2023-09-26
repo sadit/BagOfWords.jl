@@ -27,8 +27,9 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         nlist::Vector=[1],
         textconfig=TextConfig(; nlist, del_punc=false, del_diac=true, lc=true),
         qlist::Vector=[2, 3],
-        mindocs::Integer=3,
-        maxndocs::AbstractFloat=0.5,
+        mindocs::Integer=1,
+        minweight::AbstractFloat=1e-3,
+        maxndocs::AbstractFloat=1.0,
         spelling=nothing
     )
 
@@ -36,6 +37,9 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         spelling === nothing ? V : approxvoc(QgramsLookup, V, DiceDistance(); spelling...)
     end
     model = vectormodel(gw, lw, corpus, labels, V)
+    model = filter_tokens(model) do t
+        minweight <= t.weight
+    end
     X, y, dim = vectorize_corpus(model, corpus), labels, vocsize(model)
     BagOfWordsClassifier(model, linear_train(y, sparse(X, dim)))
 end
