@@ -11,13 +11,12 @@ export fit, predict, runconfig, BagOfWordsClassifier
 include("io.jl")
 include("vocab.jl")
 
-
 struct BagOfWordsClassifier{VectorModel,CLS}
     model::VectorModel
     cls::CLS
 end
 
-vectormodel(gw::EntropyWeighting, lw, corpus, labels, V) = VectorModel(gw, lw, V, corpus, labels)
+vectormodel(gw::EntropyWeighting, lw, corpus, labels, V) = VectorModel(gw, lw, V, corpus, labels; comb=SigmoidPenalizeFewSamples())
 vectormodel(gw, lw, corpus, labels, V) = VectorModel(gw, lw, V)
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTransformation();
