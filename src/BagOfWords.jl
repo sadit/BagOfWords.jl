@@ -29,6 +29,7 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         mindocs::Integer=1,
         minweight::AbstractFloat=1e-3,
         maxndocs::AbstractFloat=1.0,
+        weights=:balanced,
         spelling=nothing
     )
 
@@ -40,7 +41,14 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         minweight <= t.weight
     end
     X, y, dim = vectorize_corpus(model, corpus), labels, vocsize(model)
-    BagOfWordsClassifier(model, linear_train(y, sparse(X, dim)))
+    if weights === :balanced
+        weights = let C = countmap(y)
+            s = sum(values(C))
+            nc = length(C)
+            Dict(label => (s / (nc * count)) for (label, count) in C)
+        end
+    end
+    BagOfWordsClassifier(model, linear_train(y, sparse(X, dim); weights))
 end
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)

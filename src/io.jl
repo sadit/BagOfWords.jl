@@ -1,12 +1,25 @@
-export read_json_dataframe, load_emb
+export read_json_dataframe, read_json_lines, load_emb
 
-read_json_lines_(f) = [JSON.parse(line) for line in eachline(f)]
+function read_json_lines(f, numlines::Integer)
+    L = Dict{String, Any}[]
 
-function read_json_dataframe(filename)
+    for line in eachline(f)
+        push!(L, JSON.parse(line))
+        length(L) == numlines && break
+    end
+
+    L
+end
+
+function read_json_dataframe(filename; numlines::Int=typemax(Int))
     L = if endswith(filename, ".gz")
-        open(read_json_lines_, GzipDecompressorStream, filename)
+        open(GzipDecompressorStream, filename) do f
+            read_json_lines(f, numlines)
+        end
     else
-        open(read_json_lines_, filename)
+        open(filename) do f
+            read_json_lines(f, numlines)
+        end
     end
 
     DataFrame(L)
