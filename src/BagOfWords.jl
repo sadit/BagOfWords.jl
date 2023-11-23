@@ -2,7 +2,7 @@ module BagOfWords
 
 using TextSearch, SimilaritySearch, DataFrames, Random
 using JSON, CodecZlib, JLD2, DataFrames
-using LIBLINEAR, KNearestCenters
+using LIBSVM, KNearestCenters
 using MLUtils, StatsBase
 import StatsAPI: predict, fit
 
@@ -30,6 +30,8 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         minweight::AbstractFloat=1e-3,
         maxndocs::AbstractFloat=1.0,
         weights=:balanced,
+        nt=Threads.nthreads(),
+        verbose=false,
         spelling=nothing
     )
 
@@ -48,7 +50,8 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
             Dict(label => (s / (nc * count)) for (label, count) in C)
         end
     end
-    BagOfWordsClassifier(model, linear_train(y, sparse(X, dim); weights))
+
+    BagOfWordsClassifier(model, svmtrain(sparse(X, dim), y; weights, nt, verbose, kernel=Kernel.Linear))
 end
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
@@ -56,10 +59,10 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
     fit(BagOfWordsClassifier, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling)
 end
 
-function predict(B::BagOfWordsClassifier, corpus)
+function predict(B::BagOfWordsClassifier, corpus; nt=Threads.nthreads())
     Xtest = vectorize_corpus(B.model, corpus)
     dim = vocsize(B.model)
-    pred, decision_value = linear_predict(B.cls, sparse(Xtest, dim))
+    pred, decision_value = svmpredict(B.cls, sparse(Xtest, dim); nt)
     (; pred, decision_value)
 end
 
