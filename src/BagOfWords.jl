@@ -42,6 +42,7 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
     model = filter_tokens(model) do t
         minweight <= t.weight
     end
+
     X, y, dim = vectorize_corpus(model, corpus), labels, vocsize(model)
     if weights === :balanced
         weights = let C = countmap(y)
@@ -51,7 +52,8 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         end
     end
 
-    BagOfWordsClassifier(model, svmtrain(sparse(X, dim), y; weights, nt, verbose, kernel=Kernel.Linear))
+    cls = svmtrain(sparse(X, dim), y; weights, nt, verbose, kernel=Kernel.Linear)
+    BagOfWordsClassifier(model, cls)
 end
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
@@ -66,27 +68,21 @@ function predict(B::BagOfWordsClassifier, corpus; nt=Threads.nthreads())
     (; pred, decision_value)
 end
 
-function runconfig_(
+#=function runconfig_(
         config;
-        train = read_json_dataframe(config.trainfile),
-        test = read_json_dataframe(config.testfile)
     )
     fit(BagOfWordsClassifier)
-end
+end=#
 
-function runconfig(
-        config;
-        train = read_json_dataframe(config.trainfile),
-        test = read_json_dataframe(config.testfile)
-    )
-    C = fit(BagOfWordsClassifier, train.text, train.klass, config)
-    y = predict(C, test.text)
-    scores = classification_scores(test.klass, y.pred)
+function runconfig(config, train_text, train_labels, test_text, test_labels)
+    C = fit(BagOfWordsClassifier, train_text, train_labels, config)
+    y = predict(C, test_text)
+    scores = classification_scores(test_labels, y.pred)
     @info json(scores, 2)
 
     (; config, scores,
        size=(voc=vocsize(C.model), train=size(train, 1), test=length(y.pred)),
-       dist=(train=countmap(train.klass), test=countmap(test.klass), pred=countmap(y.pred))
+       dist=(train=countmap(train_labels), test=countmap(test_labels), pred=countmap(y.pred))
     )
 end
 
