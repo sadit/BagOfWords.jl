@@ -10,8 +10,12 @@ using Test, JSON, Downloads
     n = size(data, 1)
     itrain, itest = splitobs(1:n, at=0.7, shuffle=true)
     #config = (; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), mapfile=nothing, qlist=[2, 5], mindocs=3, collocations=7)
-    B = modelselection(data[itrain, :], 16; validation=data[itest, :]) do ygold, ypred
-        mean(ygold .== ypred)
+    B = let train = data[itrain, :]
+        validation = data[itest, :]
+
+        modelselection(train.text, train.klass, 16; validation_text=validation.text, validation_labels=validation.klass) do ygold, ypred
+            mean(ygold .== ypred)
+        end
     end
 
     @info B

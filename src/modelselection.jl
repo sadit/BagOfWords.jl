@@ -1,9 +1,10 @@
 export modelselection
 
-function modelselection(scorefun::Function, dataset, samplesize=16;
+function modelselection(scorefun::Function, text, labels, samplesize=16;
         climbing=samplesize ÷ 2,
         folds=3,
-        validation=nothing,
+        validation_text=nothing,
+        validation_labels=nothing,
         mapfile_options=[nothing],
         gw_options = [IdfWeighting(), EntropyWeighting()],
         lw_options = [BinaryLocalWeighting()],
@@ -13,7 +14,8 @@ function modelselection(scorefun::Function, dataset, samplesize=16;
         maxndocs_options = [1.0],
         minweight_options = [0.001]
     )
-    n = size(dataset, 1)
+
+    n = length(text)
     seen = Set()
     configlist = []
     scores = []
@@ -46,11 +48,13 @@ function modelselection(scorefun::Function, dataset, samplesize=16;
 
     mutate(c) = combine(c, randomconf())
 
-    evalconfig(config, train, test) = let
-        C = fit(BagOfWordsClassifier, train.text, train.klass, config)
-        y = predict(C, test.text)
-        scorefun(test.klass, y.pred)
+    evalconfig(config, train_text, train_labels, test_text, test_labels) = let
+        C = fit(BagOfWordsClassifier, train_text, train_labels, config)
+        y = predict(C, test_text)
+        scorefun(test_labels, y.pred)
     end
+
+    FOLDS = collect(kfolds(P; k=folds))
 
     for _ in 1:samplesize
         config = randomconf()
@@ -58,12 +62,12 @@ function modelselection(scorefun::Function, dataset, samplesize=16;
         push!(seen, config)
         empty!(scores)
         @info "random-search> $config -- adv $(length(configlist))"
-        if validation === nothing
-            for (itrain, itest) in kfolds(P; k=folds)
-                push!(scores, evalconfig(config, dataset[itrain, :], dataset[itest, :]))
+        if validation_text === nothing
+            for (itrain, itest) in FOLDS
+                push!(scores, evalconfig(config, text[itrain], labels[itrain], text[itest], labels[itest]))
             end
         else
-            push!(scores, evalconfig(config, dataset, validation))
+            push!(scores, evalconfig(config, text, labels, validation_text, validation_labels))
         end
 
         score = mean(scores)
@@ -78,12 +82,12 @@ function modelselection(scorefun::Function, dataset, samplesize=16;
         push!(seen, config)
         empty!(scores)
         @info "hill-climbing> $config -- adv $(length(configlist))"
-        if validation === nothing
-            for (itrain, itest) in kfolds(P; k=folds)
-                push!(scores, evalconfig(config, dataset[itrain, :], dataset[itest, :]))
+        if validation_text === nothing
+            for (itrain, itest) in FOLDS
+                push!(scores, evalconfig(config, text[itrain], labels[itrain], text[itest], labels[itest]))
             end
         else
-            push!(scores, evalconfig(config, dataset, validation))
+            push!(scores, evalconfig(config, text, labels, validation_text, validation_labels))
         end
 
         score = mean(scores)
