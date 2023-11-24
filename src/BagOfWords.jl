@@ -81,7 +81,7 @@ function runconfig(config, train_text, train_labels, test_text, test_labels)
     @info json(scores, 2)
 
     (; config, scores,
-       size=(voc=vocsize(C.model), train=size(train, 1), test=length(y.pred)),
+       size=(voc=vocsize(C.model), train=length(train_labels), test=length(y.pred)),
        dist=(train=countmap(train_labels), test=countmap(test_labels), pred=countmap(y.pred))
     )
 end
