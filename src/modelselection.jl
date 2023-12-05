@@ -8,11 +8,11 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         mapfile_options=[nothing],
         gw_options = [IdfWeighting(), EntropyWeighting()],
         lw_options = [BinaryLocalWeighting()],
-        collocations_options = [0, 3, 5, 7, 9, 11],
+        collocations_options = [7],
         mindocs_options = [3],
         qlist_options = [[2, 4], [2, 5], [3, 5]],
         maxndocs_options = [1.0],
-        minweight_options = [0.001]
+        minweight_options = [1e-4]
     )
 
     n = length(text)

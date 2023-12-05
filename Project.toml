@@ -1,7 +1,7 @@
 name = "BagOfWords"
 uuid = "87b137f8-3b59-4550-8c54-1b47926674ff"
 authors = ["Eric S. Tellez <donsadit@gmail.com> and contributors"]
-version = "0.2.1"
+version = "0.2.2"
 
 [deps]
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"

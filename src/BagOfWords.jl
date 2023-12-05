@@ -27,7 +27,7 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         textconfig=TextConfig(; nlist, del_punc=false, del_diac=true, lc=true),
         qlist::Vector=[2, 3],
         mindocs::Integer=1,
-        minweight::AbstractFloat=1e-3,
+        minweight::AbstractFloat=1e-4,
         maxndocs::AbstractFloat=1.0,
         weights=:balanced,
         nt=Threads.nthreads(),
