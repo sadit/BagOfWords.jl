@@ -1,28 +1,61 @@
 module BagOfWords
 
-using TextSearch, SimilaritySearch, DataFrames, Random
-using JSON, CodecZlib, JLD2, DataFrames
+using TextSearch, SimilaritySearch, SimSearchManifoldLearning
+using Random, JSON, CodecZlib, JLD2, DataFrames
 using LIBSVM, KNearestCenters
 using MLUtils, StatsBase
 import StatsAPI: predict, fit
 
-export fit, predict, runconfig, BagOfWordsClassifier
+export fit, predict, runconfig, BagOfWordsClassifier, classification_scores, f1_score, recall_score, precision_score, accuracy_score,
+        RawVectors, UmapProjection, RandomLayout, SpectralLayout
 
 include("io.jl")
 include("vocab.jl")
 
-struct BagOfWordsClassifier{VectorModel,CLS}
-    model::VectorModel
+struct BagOfWordsClassifier{VMODEL,PROJ,CLS}
+    model::VMODEL
+    proj::PROJ
     cls::CLS
 end
 
-#comb=SigmoidPenalizeFewSamples()
-vectormodel(gw::EntropyWeighting, lw, corpus, labels, V; smooth=5, comb=NormalizedEntropy()) = VectorModel(gw, lw, V, corpus, labels; comb, smooth)
-#vectormodel(gw::EntropyWeighting, lw, corpus, labels, V; smooth=0, comb=SigmoidPenalizeFewSamples()) = VectorModel(gw, lw, V, corpus, labels; comb, smooth)
+abstract type SparseProjection end
 
+struct RawVectors <: SparseProjection
+    dim::Int32
+end
+
+RawVectors() = RawVectors(0)
+
+fit(::RawVectors, X, dim::Integer) = RawVectors(convert(Int32, dim))
+predict(proj::RawVectors, X) = sparse(X, proj.dim)
+
+struct UmapProjection{UmapType} <: SparseProjection
+    umap::UmapType
+    k::Int
+    maxoutdim::Int
+    n_epochs::Int
+    neg_sample_rate::Int
+    tol::Float64
+    layout
+end
+
+function UmapProjection(; k::Integer=15, maxoutdim::Integer=3, n_epochs::Integer=100, layout=SpectralLayout(), neg_sample_rate::Integer=3, tol::AbstractFloat=1e-4)
+    UmapProjection(nothing, k, maxoutdim, n_epochs, neg_sample_rate, tol, layout)
+end
+
+function fit(U::UmapProjection, X, dim::Integer)
+    index = ExhaustiveSearch(; db=X, dist=NormalizedCosineDistance())
+    umap = fit(UMAP, index; U.k, U.maxoutdim, U.n_epochs, U.neg_sample_rate, U.tol, U.layout)
+    UmapProjection(umap, U.k, U.maxoutdim, U.n_epochs, U.neg_sample_rate, U.tol, U.layout)
+end
+
+predict(proj::UmapProjection, X) = predict(proj.umap, X)
+
+#comb=SigmoidPenalizeFewSamples()
+vectormodel(gw::EntropyWeighting, lw, corpus, labels, V; smooth, comb) = VectorModel(gw, lw, V, corpus, labels; comb, smooth)
 vectormodel(gw, lw, corpus, labels, V; kwargs...) = VectorModel(gw, lw, V)
 
-function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTransformation();
+function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus, labels, tt=IdentityTokenTransformation();
         gw=EntropyWeighting(),
         lw=BinaryLocalWeighting(),
         collocations::Integer=0,
@@ -35,14 +68,15 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         smooth::Real=5,
         comb=NormalizedEntropy(), #SigmoidPenalizeFewSamples(), #NormalizedEntropy(),
         weights=:balanced,
+        spelling=nothing,
         nt=Threads.nthreads(),
-        verbose=false,
-        spelling=nothing
+        verbose=false
     )
 
     V = let V = vocab(corpus, tt; collocations, nlist, qlist, mindocs, maxndocs)
         spelling === nothing ? V : approxvoc(QgramsLookup, V, DiceDistance(); spelling...)
     end
+
     model = vectormodel(gw, lw, corpus, labels, V; smooth, comb)
     model = filter_tokens(model) do t
         minweight <= t.weight
@@ -57,20 +91,21 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         end
     end
 
-    cls = svmtrain(sparse(X, dim), y; weights, nt, verbose, kernel=Kernel.Linear)
-    BagOfWordsClassifier(model, cls)
+    P = fit(projection, X, dim)
+    cls = svmtrain(predict(P, X), y; weights, nt, verbose, kernel=Kernel.Linear)
+    BagOfWordsClassifier(model, P, cls)
 end
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
     tt = config.mapfile === nothing ? IdentityTokenTransformation() : Synonyms(config.mapfile)
-    fit(BagOfWordsClassifier, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling, config.smooth, config.comb)
+    fit(BagOfWordsClassifier, config.projection, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling, config.smooth, config.comb)
 end
 
 function predict(B::BagOfWordsClassifier, corpus; nt=Threads.nthreads())
     Xtest = vectorize_corpus(B.model, corpus)
-    dim = vocsize(B.model)
-    pred, decision_value = svmpredict(B.cls, sparse(Xtest, dim); nt)
-    (; pred, decision_value)
+    X = predict(B.proj, Xtest)
+    pred, val = svmpredict(B.cls, X; nt)
+    (; pred, val)
 end
 
 function runconfig(config, train_text, train_labels, test_text, test_labels)
@@ -84,7 +119,6 @@ function runconfig(config, train_text, train_labels, test_text, test_labels)
        dist=(train=countmap(train_labels), test=countmap(test_labels), pred=countmap(y.pred))
     )
 end
-
 
 include("modelselection.jl")
 

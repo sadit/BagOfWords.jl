@@ -15,12 +15,15 @@ using Test, JSON, Downloads
         validation = data[itest, :]
 
         modelselection(train.text, train.klass, 16;
+                       projection_options=[RawVectors(), UmapProjection(k=8, layout=RandomLayout(), n_epochs=50)],
                        validation_text=validation.text,
                        validation_labels=validation.klass) do ygold, ypred
             mean(ygold .== ypred)
         end
     end
 
-    @info B
-    # Write your tests here.
+    for b in B
+        @info b
+    end
+    # Write r tests here.
 end

@@ -6,15 +6,16 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         validation_text=nothing,
         validation_labels=nothing,
         mapfile_options=[nothing],
+        projection_options = [RawVectors(), UmapProjection(maxoutdim=8)],
         gw_options = [IdfWeighting(), EntropyWeighting()],
         lw_options = [BinaryLocalWeighting()],
         collocations_options = [7],
         mindocs_options = [3],
         maxndocs_options = [1.0],
-        smooth_options = [5, 10, 20],
+        smooth_options = [3, 9, 15],
         comb_options = [NormalizedEntropy()],
         qlist_options = [[2, 4], [2, 5], [3, 5]],
-        minweight_options = [1e-5],
+        minweight_options = [1e-4]
     )
 
     n = length(text)
@@ -24,6 +25,7 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
     P = collect(1:n); shuffle!(P)
     
     randomconf() = let
+        projection = rand(projection_options)
         gw = rand(gw_options)
         lw = rand(lw_options)
         collocations = rand(collocations_options)
@@ -41,10 +43,11 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         qlist = rand(qlist_options)
         mapfile = rand(mapfile_options)
 
-        (; gw, lw, collocations, mindocs, maxndocs, smooth, comb, minweight, qlist, mapfile, spelling=nothing)
+        (; projection, gw, lw, collocations, mindocs, maxndocs, smooth, comb, minweight, qlist, mapfile, spelling=nothing)
     end
 
     combine(a, b) = let
+        projection = rand((a.projection, b.projection))
         gw = rand((a.gw, b.gw))
         lw = rand((a.lw, b.lw))
         collocations = rand((a.collocations, b.collocations))
@@ -61,7 +64,7 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         qlist = rand((a.qlist, b.qlist))
         mapfile = rand((a.mapfile, b.mapfile))
 
-        (; gw, lw, collocations, mindocs, maxndocs, smooth, comb, minweight, qlist, mapfile, spelling=nothing)
+        (; projection, gw, lw, collocations, mindocs, maxndocs, smooth, comb, minweight, qlist, mapfile, spelling=nothing)
     end
 
     mutate(c) = combine(c, randomconf())
