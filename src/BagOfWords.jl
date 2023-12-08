@@ -16,8 +16,11 @@ struct BagOfWordsClassifier{VectorModel,CLS}
     cls::CLS
 end
 
-vectormodel(gw::EntropyWeighting, lw, corpus, labels, V) = VectorModel(gw, lw, V, corpus, labels; comb=SigmoidPenalizeFewSamples())
-vectormodel(gw, lw, corpus, labels, V) = VectorModel(gw, lw, V)
+#comb=SigmoidPenalizeFewSamples()
+vectormodel(gw::EntropyWeighting, lw, corpus, labels, V; smooth=5, comb=NormalizedEntropy()) = VectorModel(gw, lw, V, corpus, labels; comb, smooth)
+#vectormodel(gw::EntropyWeighting, lw, corpus, labels, V; smooth=0, comb=SigmoidPenalizeFewSamples()) = VectorModel(gw, lw, V, corpus, labels; comb, smooth)
+
+vectormodel(gw, lw, corpus, labels, V; kwargs...) = VectorModel(gw, lw, V)
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTransformation();
         gw=EntropyWeighting(),
@@ -26,9 +29,11 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
         nlist::Vector=[1],
         textconfig=TextConfig(; nlist, del_punc=false, del_diac=true, lc=true),
         qlist::Vector=[2, 3],
-        mindocs::Integer=1,
+        mindocs::Integer=3,
         minweight::AbstractFloat=1e-4,
         maxndocs::AbstractFloat=1.0,
+        smooth::Real=5,
+        comb=NormalizedEntropy(), #SigmoidPenalizeFewSamples(), #NormalizedEntropy(),
         weights=:balanced,
         nt=Threads.nthreads(),
         verbose=false,
@@ -38,7 +43,7 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, tt=IdentityTokenTrans
     V = let V = vocab(corpus, tt; collocations, nlist, qlist, mindocs, maxndocs)
         spelling === nothing ? V : approxvoc(QgramsLookup, V, DiceDistance(); spelling...)
     end
-    model = vectormodel(gw, lw, corpus, labels, V)
+    model = vectormodel(gw, lw, corpus, labels, V; smooth, comb)
     model = filter_tokens(model) do t
         minweight <= t.weight
     end
@@ -58,7 +63,7 @@ end
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
     tt = config.mapfile === nothing ? IdentityTokenTransformation() : Synonyms(config.mapfile)
-    fit(BagOfWordsClassifier, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling)
+    fit(BagOfWordsClassifier, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling, config.smooth, config.comb)
 end
 
 function predict(B::BagOfWordsClassifier, corpus; nt=Threads.nthreads())
@@ -67,12 +72,6 @@ function predict(B::BagOfWordsClassifier, corpus; nt=Threads.nthreads())
     pred, decision_value = svmpredict(B.cls, sparse(Xtest, dim); nt)
     (; pred, decision_value)
 end
-
-#=function runconfig_(
-        config;
-    )
-    fit(BagOfWordsClassifier)
-end=#
 
 function runconfig(config, train_text, train_labels, test_text, test_labels)
     C = fit(BagOfWordsClassifier, train_text, train_labels, config)
