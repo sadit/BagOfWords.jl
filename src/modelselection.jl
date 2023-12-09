@@ -6,14 +6,14 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         validation_text=nothing,
         validation_labels=nothing,
         mapfile_options=[nothing],
-        projection_options = [RawVectors(), UmapProjection(maxoutdim=8)],
+        projection_options = [RawVectors()],
         gw_options = [IdfWeighting(), EntropyWeighting()],
         lw_options = [BinaryLocalWeighting()],
         collocations_options = [7],
         mindocs_options = [3],
         maxndocs_options = [1.0],
-        smooth_options = [3, 9, 15],
-        comb_options = [NormalizedEntropy()],
+        smooth_options = [0, 0.1],
+        comb_options = [SigmoidPenalizeFewSamples(), NormalizedEntropy()],
         qlist_options = [[2, 4], [2, 5], [3, 5]],
         minweight_options = [1e-4]
     )

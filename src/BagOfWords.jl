@@ -6,8 +6,11 @@ using LIBSVM, KNearestCenters
 using MLUtils, StatsBase
 import StatsAPI: predict, fit
 
-export fit, predict, runconfig, BagOfWordsClassifier, classification_scores, f1_score, recall_score, precision_score, accuracy_score,
-        RawVectors, UmapProjection, RandomLayout, SpectralLayout
+export fit, predict, runconfig, BagOfWordsClassifier,
+       classification_scores, f1_score, recall_score, precision_score, accuracy_score,
+       RawVectors, UmapProjection, RandomLayout, SpectralLayout,
+       NormalizedEntropy, SigmoidPenalizeFewSamples
+        
 
 include("io.jl")
 include("vocab.jl")
@@ -65,7 +68,7 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
         mindocs::Integer=3,
         minweight::AbstractFloat=1e-4,
         maxndocs::AbstractFloat=1.0,
-        smooth::Real=5,
+        smooth::Real=0.5,
         comb=NormalizedEntropy(), #SigmoidPenalizeFewSamples(), #NormalizedEntropy(),
         weights=:balanced,
         spelling=nothing,
