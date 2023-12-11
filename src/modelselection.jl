@@ -15,7 +15,8 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         smooth_options = [0, 0.1],
         comb_options = [SigmoidPenalizeFewSamples(), NormalizedEntropy()],
         qlist_options = [[2, 4], [2, 5], [3, 5]],
-        minweight_options = [1e-4]
+        minweight_options = [1e-4],
+        kernel_options = [Kernel.Linear()]
     )
 
     n = length(text)
@@ -31,6 +32,7 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         collocations = rand(collocations_options)
         mindocs = rand(mindocs_options)
         maxndocs = rand(maxndocs_options)
+        kernel = rand(kernel_options)
         if gw isa EntropyWeighting
             smooth = rand(smooth_options)
             comb = rand(comb_options)
@@ -43,7 +45,7 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         qlist = rand(qlist_options)
         mapfile = rand(mapfile_options)
 
-        (; projection, gw, lw, collocations, mindocs, maxndocs, smooth, comb, minweight, qlist, mapfile, spelling=nothing)
+        (; projection, gw, lw, collocations, mindocs, maxndocs, smooth, comb, minweight, qlist, kernel, mapfile, spelling=nothing)
     end
 
     combine(a, b) = let
@@ -53,6 +55,7 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         collocations = rand((a.collocations, b.collocations))
         mindocs = rand((a.mindocs, b.mindocs)) 
         maxndocs = rand((a.maxndocs, b.maxndocs))
+        kernel = rand((a.kernel, b.kernel))
         if gw isa EntropyWeighting
             smooth = rand(smooth_options)
             comb = rand(comb_options)
@@ -64,7 +67,7 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         qlist = rand((a.qlist, b.qlist))
         mapfile = rand((a.mapfile, b.mapfile))
 
-        (; projection, gw, lw, collocations, mindocs, maxndocs, smooth, comb, minweight, qlist, mapfile, spelling=nothing)
+        (; projection, gw, lw, collocations, mindocs, maxndocs, smooth, comb, minweight, qlist, kernel, mapfile, spelling=nothing)
     end
 
     mutate(c) = combine(c, randomconf())

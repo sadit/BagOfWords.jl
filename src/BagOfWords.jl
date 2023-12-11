@@ -71,6 +71,7 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
         smooth::Real=0.5,
         comb=NormalizedEntropy(), #SigmoidPenalizeFewSamples(), #NormalizedEntropy(),
         weights=:balanced,
+        kernel=Kernel.Linear,
         spelling=nothing,
         nt=Threads.nthreads(),
         verbose=false
@@ -95,13 +96,13 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
     end
 
     P = fit(projection, X, dim)
-    cls = svmtrain(predict(P, X), y; weights, nt, verbose, kernel=Kernel.Linear)
+    cls = svmtrain(predict(P, X), y; weights, nt, verbose, kernel)
     BagOfWordsClassifier(model, P, cls)
 end
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
     tt = config.mapfile === nothing ? IdentityTokenTransformation() : Synonyms(config.mapfile)
-    fit(BagOfWordsClassifier, config.projection, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling, config.smooth, config.comb)
+    fit(BagOfWordsClassifier, config.projection, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling, config.smooth, config.comb, config.kernel)
 end
 
 function predict(B::BagOfWordsClassifier, corpus; nt=Threads.nthreads())
