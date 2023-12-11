@@ -16,7 +16,7 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         comb_options = [SigmoidPenalizeFewSamples(), NormalizedEntropy()],
         qlist_options = [[2, 4], [2, 5], [3, 5]],
         minweight_options = [1e-4],
-        kernel_options = [Kernel.Linear()]
+        kernel_options = [Kernel.Linear]
     )
 
     n = length(text)
