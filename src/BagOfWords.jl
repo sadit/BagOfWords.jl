@@ -2,7 +2,7 @@ module BagOfWords
 
 using TextSearch, SimilaritySearch, SimSearchManifoldLearning
 using Random, JSON, CodecZlib, JLD2, DataFrames
-using LIBSVM, KNearestCenters
+using LIBLINEAR, LIBSVM, KNearestCenters
 using MLUtils, StatsBase
 import StatsAPI: predict, fit
 
@@ -87,17 +87,27 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
     end
 
     X, y, dim = vectorize_corpus(model, corpus), labels, vocsize(model)
-    if weights === :balanced
-        weights = let C = countmap(y)
-            s = sum(values(C))
-            nc = length(C)
-            Dict(label => (s / (nc * count)) for (label, count) in C)
-        end
-    end
+    weights = weights === :balanced ? balanced_weights(y) : weights
 
     P = fit(projection, X, dim)
-    cls = svmtrain(predict(P, X), y; weights, nt, verbose, kernel)
+    cls = SVMTRAIN(predict(P, X), y, kernel; weights, nt, verbose)
     BagOfWordsClassifier(model, P, cls)
+end
+
+function SVMTRAIN(X, y, ::Val{Kernel.Linear}; weights, nt, verbose)
+    linear_train(y, X; verbose, weights)
+end
+
+function SVMTRAIN(X, y, kernel;  weights, nt, verbose)
+    svmtrain(X, y;  weights, nt, verbose, kernel)
+end
+
+function SVMPREDICT(model::LinearModel, X; nt)
+    linear_predict(model, X)
+end
+
+function SVMPREDICT(model, X; nt)
+    svmpredict(model, X; nt)
 end
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
@@ -105,10 +115,17 @@ function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
     fit(BagOfWordsClassifier, config.projection, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling, config.smooth, config.comb, config.kernel)
 end
 
+function balanced_weights(y)
+    C = countmap(y)
+    s = sum(values(C))
+    nc = length(C)
+    Dict(label => (s / (nc * count)) for (label, count) in C)
+end
+
 function predict(B::BagOfWordsClassifier, corpus; nt=Threads.nthreads())
     Xtest = vectorize_corpus(B.model, corpus)
     X = predict(B.proj, Xtest)
-    pred, val = svmpredict(B.cls, X; nt)
+    pred, val = SVMPREDICT(B.cls, X; nt)
     (; pred, val)
 end
 
