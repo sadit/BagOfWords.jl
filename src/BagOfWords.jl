@@ -90,25 +90,17 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
     weights = weights === :balanced ? balanced_weights(y) : weights
 
     P = fit(projection, X, dim)
-    cls = SVMTRAIN(predict(P, X), y, kernel; weights, nt, verbose)
+    cls = if kernel == Kernel.Linear
+        linear_train(y, predict(P, X); weights, verbose)
+    else
+        svmtrain(X, y;  weights, nt, verbose, kernel)
+    end
+
     BagOfWordsClassifier(model, P, cls)
 end
 
-function SVMTRAIN(X, y, ::Val{Kernel.Linear}; weights, nt, verbose)
-    linear_train(y, X; verbose, weights)
-end
-
-function SVMTRAIN(X, y, kernel;  weights, nt, verbose)
-    svmtrain(X, y;  weights, nt, verbose, kernel)
-end
-
-function SVMPREDICT(model::LinearModel, X; nt)
-    linear_predict(model, X)
-end
-
-function SVMPREDICT(model, X; nt)
-    svmpredict(model, X; nt)
-end
+SVMPREDICT(model::LinearModel, X; nt) = linear_predict(model, X)
+SVMPREDICT(model, X; nt) = svmpredict(model, X; nt)
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
     tt = config.mapfile === nothing ? IdentityTokenTransformation() : Synonyms(config.mapfile)
