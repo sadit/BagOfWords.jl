@@ -70,10 +70,8 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
         maxndocs::AbstractFloat=1.0,
         smooth::Real=0.5,
         comb=NormalizedEntropy(), #SigmoidPenalizeFewSamples(), #NormalizedEntropy(),
-        weights=:balanced,
-        kernel=Kernel.Linear,
+        svm=(kernel=:linear, kwargs=(solver_type=:auto, C=1.0, bias=1.0, weights=:balanced)), # if you use kernel=Kernel.Linear you will be using LIBSVM linear kernel SVM
         spelling=nothing,
-        nt=Threads.nthreads(),
         verbose=false
     )
 
@@ -87,13 +85,27 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
     end
 
     X, y, dim = vectorize_corpus(model, corpus), labels, vocsize(model)
-    weights = weights === :balanced ? balanced_weights(y) : weights
-
+    weights = get(svm, :weights, :balanced)
+    weights === :balanced && (weights = balanced_weights(y))
+    kwargs = get(svm, :kwargs, NamedTuple())
+    
     P = fit(projection, X, dim)
-    cls = if kernel == Kernel.Linear
-        linear_train(y, predict(P, X); weights, verbose)
-    else
-        svmtrain(X, y;  weights, nt, verbose, kernel)
+    solver = :auto
+    cls = if get(svm, :kernel, :linear) === :linear
+        let X_ = predict(P, X)
+            solver_type = if get(kwargs, :solver_type, :auto) === :auto
+                size(X_, 2) > size(X_, 1) ? LIBLINEAR.L2R_L2LOSS_SVC_DUAL : LIBLINEAR.L2R_L2LOSS_SVC
+            else
+                svm.solver_type
+            end
+
+            kwargs = (; kwargs..., solver_type, weights, verbose)
+            linear_train(y, X_; kwargs...)
+        end
+    else 
+        nt = get(kwargs, :nt, Threads.nthreads())
+        kwargs = (; kwargs..., nt, weights, verbose, kernel=svm.kernel)
+        svmtrain(X, y;  kwargs...)
     end
 
     BagOfWordsClassifier(model, P, cls)
@@ -104,7 +116,7 @@ SVMPREDICT(model, X; nt) = svmpredict(model, X; nt)
 
 function fit(::Type{BagOfWordsClassifier}, corpus, labels, config::NamedTuple)
     tt = config.mapfile === nothing ? IdentityTokenTransformation() : Synonyms(config.mapfile)
-    fit(BagOfWordsClassifier, config.projection, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling, config.smooth, config.comb, config.kernel)
+    fit(BagOfWordsClassifier, config.projection, corpus, labels, tt; config.collocations, config.mindocs, config.maxndocs, config.qlist, config.gw, config.lw, config.spelling, config.smooth, config.comb, config.svm)
 end
 
 function balanced_weights(y)
