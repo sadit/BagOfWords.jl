@@ -74,12 +74,14 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
 
     evalconfig(config, train_text, train_labels, test_text, test_labels) = let
         try
-            C = fit(BagOfWordsClassifier, train_text, train_labels, config)
-            y = predict(C, test_text)
+            @info "EVAL fit $config"
+            @time C = fit(BagOfWordsClassifier, train_text, train_labels, config)
+            @info "EVAL predict $config"
+            @time y = predict(C, test_text)
             scorefun(test_labels, y.pred)
         catch err
             @warn "failure of config $config -- please check it alone"
-            Base.showerror(stdout, e)
+            Base.showerror(stdout, err)
             Base.show_backtrace(stdout, Base.catch_backtrace())
             -1.0
         end

@@ -70,7 +70,7 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
         maxndocs::AbstractFloat=1.0,
         smooth::Real=0.5,
         comb=NormalizedEntropy(), #SigmoidPenalizeFewSamples(), #NormalizedEntropy(),
-        svm=(kernel=:linear, kwargs=(solver_type=:auto, C=1.0, bias=1.0, weights=:balanced)), # if you use kernel=Kernel.Linear you will be using LIBSVM linear kernel SVM
+        svm=(; kernel=:linear), # if you use kernel=Kernel.Linear you will be using LIBSVM linear kernel SVM
         spelling=nothing,
         verbose=false
     )
@@ -90,20 +90,21 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
     kwargs = get(svm, :kwargs, NamedTuple())
     
     P = fit(projection, X, dim)
-    solver = :auto
     kernel = get(svm, :kernel, :linear)
+    verbose = get(svm, :verbose, verbose)
+    nt = get(kwargs, :nt, Threads.nthreads())
     X_ = predict(P, X)
+    
     cls = if kernel === :linear
-        solver_type = if get(kwargs, :solver_type, :auto) === :auto
-            size(X_, 2) > size(X_, 1) ? LIBLINEAR.L2R_L2LOSS_SVC_DUAL : LIBLINEAR.L2R_L2LOSS_SVC
+        if size(X_, 2) > size(X_, 1)
+            solver_type = LIBLINEAR.L2R_L2LOSS_SVC_DUAL
+            kwargs = (; kwargs..., solver_type, weights, verbose)
+            linear_train(y, X_; kwargs...)
         else
-            svm.solver_type
+            kwargs = (; kwargs..., nt, weights, verbose, kernel=Kernel.Linear)
+            svmtrain(X_, y;  kwargs...)
         end
-
-        kwargs = (; kwargs..., solver_type, weights, verbose)
-        linear_train(y, X_; kwargs...)
     else 
-        nt = get(kwargs, :nt, Threads.nthreads())
         kwargs = (; kwargs..., nt, weights, verbose, kernel)
         svmtrain(X_, y;  kwargs...)
     end
