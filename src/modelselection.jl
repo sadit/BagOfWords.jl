@@ -73,9 +73,16 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
     mutate(c) = combine(c, randomconf())
 
     evalconfig(config, train_text, train_labels, test_text, test_labels) = let
-        C = fit(BagOfWordsClassifier, train_text, train_labels, config)
-        y = predict(C, test_text)
-        scorefun(test_labels, y.pred)
+        try
+            C = fit(BagOfWordsClassifier, train_text, train_labels, config)
+            y = predict(C, test_text)
+            scorefun(test_labels, y.pred)
+        catch err
+            @warn "failure of config $config -- please check it alone"
+            Base.showerror(stdout, e)
+            Base.show_backtrace(stdout, Base.catch_backtrace())
+            -1.0
+        end
     end
 
     FOLDS = collect(kfolds(P; k=folds))
@@ -88,10 +95,12 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         @info "random-search> $config -- adv $(length(configlist))"
         if validation_text === nothing
             for (itrain, itest) in FOLDS
-                push!(scores, evalconfig(config, text[itrain], labels[itrain], text[itest], labels[itest]))
+                s = evalconfig(config, text[itrain], labels[itrain], text[itest], labels[itest])
+                s >= 0.0 && push!(scores, s)
             end
         else
-            push!(scores, evalconfig(config, text, labels, validation_text, validation_labels))
+            s = evalconfig(config, text, labels, validation_text, validation_labels)
+            s >= 0.0 && push!(scores, s)
         end
 
         score = mean(scores)
@@ -108,10 +117,12 @@ function modelselection(scorefun::Function, text, labels, samplesize=16;
         @info "hill-climbing> $config -- adv $(length(configlist))"
         if validation_text === nothing
             for (itrain, itest) in FOLDS
-                push!(scores, evalconfig(config, text[itrain], labels[itrain], text[itest], labels[itest]))
+                s = evalconfig(config, text[itrain], labels[itrain], text[itest], labels[itest])
+                s >= 0.0 && push!(scores, s)
             end
         else
-            push!(scores, evalconfig(config, text, labels, validation_text, validation_labels))
+            s = evalconfig(config, text, labels, validation_text, validation_labels)
+            s >= 0.0 && push!(scores, s)
         end
 
         score = mean(scores)

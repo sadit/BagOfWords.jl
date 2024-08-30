@@ -92,21 +92,20 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
     P = fit(projection, X, dim)
     solver = :auto
     kernel = get(svm, :kernel, :linear)
+    X_ = predict(P, X)
     cls = if kernel === :linear
-        let X_ = predict(P, X)
-            solver_type = if get(kwargs, :solver_type, :auto) === :auto
-                size(X_, 2) > size(X_, 1) ? LIBLINEAR.L2R_L2LOSS_SVC_DUAL : LIBLINEAR.L2R_L2LOSS_SVC
-            else
-                svm.solver_type
-            end
-
-            kwargs = (; kwargs..., solver_type, weights, verbose)
-            linear_train(y, X_; kwargs...)
+        solver_type = if get(kwargs, :solver_type, :auto) === :auto
+            size(X_, 2) > size(X_, 1) ? LIBLINEAR.L2R_L2LOSS_SVC_DUAL : LIBLINEAR.L2R_L2LOSS_SVC
+        else
+            svm.solver_type
         end
+
+        kwargs = (; kwargs..., solver_type, weights, verbose)
+        linear_train(y, X_; kwargs...)
     else 
         nt = get(kwargs, :nt, Threads.nthreads())
         kwargs = (; kwargs..., nt, weights, verbose, kernel)
-        svmtrain(X, y;  kwargs...)
+        svmtrain(X_, y;  kwargs...)
     end
 
     BagOfWordsClassifier(model, P, cls)
