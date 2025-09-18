@@ -2,7 +2,7 @@ module BagOfWords
 
 using TextSearch, SimilaritySearch, SimSearchManifoldLearning
 using Random, JSON, CodecZlib, JLD2, DataFrames
-using LIBLINEAR, LIBSVM, KNearestCenters
+using LIBLINEAR, LIBSVM
 using MLUtils, StatsBase
 import StatsAPI: predict, fit
 
@@ -47,7 +47,7 @@ function UmapProjection(; k::Integer=15, maxoutdim::Integer=3, n_epochs::Integer
 end
 
 function fit(U::UmapProjection, X, dim::Integer)
-    index = ExhaustiveSearch(; db=X, dist=NormalizedCosineDistance())
+	index = ExhaustiveSearch(; db=VectorDatabase(X), dist=NormalizedCosineDistance())
     umap = fit(UMAP, index; U.k, U.maxoutdim, U.n_epochs, U.neg_sample_rate, U.tol, U.layout)
     UmapProjection(umap, U.k, U.maxoutdim, U.n_epochs, U.neg_sample_rate, U.tol, U.layout)
 end
@@ -84,7 +84,7 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
         minweight <= t.weight
     end
 
-    X, y, dim = vectorize_corpus(model, corpus), labels, vocsize(model)
+	X, y, dim = vectorize_corpus(model, corpus), labels, vocsize(model)
     weights = get(svm, :weights, :balanced)
     weights === :balanced && (weights = balanced_weights(y))
     kwargs = get(svm, :kwargs, NamedTuple())
