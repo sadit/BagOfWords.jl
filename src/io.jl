@@ -35,7 +35,7 @@ function load_emb(embfile)
         f["embeddings"], f["vocab"]
     end
 
-    dist = NormalizedCosineDistance()
+    dist = NormCosine()
 
     (; vocab, embeddings, dist)
 end

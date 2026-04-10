@@ -5,6 +5,7 @@ using Random, JSON, CodecZlib, JLD2, DataFrames
 using LIBLINEAR, LIBSVM
 using MLUtils, StatsBase
 import StatsAPI: predict, fit
+const NormCosine = TextSearch.NormCosine
 
 export fit, predict, runconfig, BagOfWordsClassifier,
        classification_scores, f1_score, recall_score, precision_score, accuracy_score,
@@ -47,7 +48,7 @@ function UmapProjection(; k::Integer=15, maxoutdim::Integer=3, n_epochs::Integer
 end
 
 function fit(U::UmapProjection, X, dim::Integer)
-	index = ExhaustiveSearch(; db=VectorDatabase(X), dist=NormalizedCosineDistance())
+	index = ExhaustiveSearch(; db=VectorDatabase(X), dist=NormCosine())
     umap = fit(UMAP, index; U.k, U.maxoutdim, U.n_epochs, U.neg_sample_rate, U.tol, U.layout)
     UmapProjection(umap, U.k, U.maxoutdim, U.n_epochs, U.neg_sample_rate, U.tol, U.layout)
 end
@@ -76,7 +77,7 @@ function fit(::Type{BagOfWordsClassifier}, projection::SparseProjection, corpus,
     )
 
     V = let V = vocab(corpus, tt; collocations, nlist, qlist, mindocs, maxndocs)
-        spelling === nothing ? V : approxvoc(QgramsLookup, V, DiceDistance(); spelling...)
+        spelling === nothing ? V : approxvoc(QgramsLookup, V, Dist.Sets.Dice(); spelling...)
     end
 
     model = vectormodel(gw, lw, corpus, labels, V; smooth, comb)

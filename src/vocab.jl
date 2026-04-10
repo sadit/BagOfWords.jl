@@ -1,8 +1,8 @@
-export Synonyms, vocabmap, create_vocabmap, vocab 
+export Synonyms, vocabmap, create_vocabmap, vocab
 
 struct Synonyms <: AbstractTokenTransformation
     map::Dict{String,String}
-    
+
     Synonyms(mapfile) = new(open(JSON.parse, mapfile))
 end
 
@@ -14,18 +14,18 @@ function TextSearch.transform_unigram(tt::ChainTransformation, tok)
     for t in tt.list
         tok = TextSearch.transform_unigram(t, tok)
         tok === nothing && return nothing
-    end 
+    end
 
     tok
 end
 
 function vocab(
-            text,
-            tt=IdentityTokenTransformation();
-            nlist=[1], qlist=[], collocations=0, mindocs=1, maxndocs=1.0, 
-            textconfig=TextConfig(; nlist, del_punc=false, del_diac=true, lc=true),
-    )
-    
+    text,
+    tt=IdentityTokenTransformation();
+    nlist=[1], qlist=[], collocations=0, mindocs=1, maxndocs=1.0,
+    textconfig=TextConfig(; nlist, del_punc=false, del_diac=true, lc=true),
+)
+
     V = Vocabulary(TextConfig(textconfig; qlist, collocations, tt), text)
     if mindocs > 1 || maxndocs < 1
         filter_tokens(V) do t
@@ -47,7 +47,7 @@ Creates an index for the given database
 - `minrecall`: controls the quality of the approximation (between 0 and 1)
 - `verbose`: set `verbose=false` to reduce the output of the index's building
 """
-function create_index(dist::SemiMetric, db::AbstractDatabase; k::Int=16, minrecall::Float64=0.95, verbose::Bool=true)
+function create_index(dist::Dist.SemiMetric, db::AbstractDatabase; k::Int=16, minrecall::Float64=0.95, verbose::Bool=true)
     G = SearchGraph(; dist, db, verbose)
     minrecall = MinRecall(minrecall)
     callbacks = SearchGraphCallbacks(minrecall; ksearch=k, verbose)
@@ -67,7 +67,7 @@ function simvocab(names, vocab, embeddings, dist; verbose=true, k=12, minrecall=
     X = StrideMatrixDatabase(embeddings)
     Y = StrideMatrixDatabase(embeddings[:, ivocabidx])
     G = create_index(dist, Y; k, minrecall, verbose)
-    
+
     n = length(vocab)
     knns, dists = searchbatch(G, X, k)
     ivocab = vocab[ivocabidx]
@@ -75,10 +75,10 @@ function simvocab(names, vocab, embeddings, dist; verbose=true, k=12, minrecall=
     (; G, vocab, ivocab, ivocabidx, knns, dists)
 end
 
-function distquantiles(dist::SemiMetric, X::AbstractDatabase, q=[0.0, 0.25, 0.5, 0.75, 1.0]; samplesize=2^20)
+function distquantiles(dist::Dist.SemiMetric, X::AbstractDatabase, q=[0.0, 0.25, 0.5, 0.75, 1.0]; samplesize=2^20)
     n = length(X)
     S = Vector{Float32}(undef, samplesize)
-    
+
     Threads.@threads for i in 1:samplesize
         S[i] = evaluate(dist, X[rand(1:n)], X[rand(1:n)])
     end
@@ -88,13 +88,13 @@ end
 
 function vocabmap_(p::NamedTuple, dmax)
     map = Dict{String,String}()
-    
+
     for i in 1:size(p.knns, 2)
-       nn = p.knns[1, i]
-       dist = p.dists[1, i]
-       if dist <= dmax
-           map[p.vocab[i]] = p.ivocab[nn]
-       end
+        nn = p.knns[1, i]
+        dist = p.dists[1, i]
+        if dist <= dmax
+            map[p.vocab[i]] = p.ivocab[nn]
+        end
     end
 
     map
